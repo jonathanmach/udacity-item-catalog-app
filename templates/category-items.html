@@ -1,0 +1,12 @@
+{% extends "base.html" %} {% block body %}
+
+        <h5>{{category_name}} Items ({{item_list.count()}} items) </h5>
+        <div class="collection">
+            {% for item in item_list %}
+            <a href='{{url_for('catalog', category_name=item.category.name, item_name=item.name)}}'
+            class="collection-item">
+                {{item.name}}</a>
+        {% endfor%}
+        </div>
+
+{% endblock %}
