@@ -1,0 +1,41 @@
+{% extends "base.html" %} {% block body %}
+    <div class="col s9">
+
+        <form method="post" action="">
+            <!-- Teal page content  -->
+            <div class="section">
+                <h5><i class="material-icons">add</i> Add Item</h5>
+
+                <div class="row">
+                    <div class="input-field col s6">
+                        {#                Item Title#}
+                        <input value="" name="title" type="text" class="validate">
+                        <label class="active" for="title">Title</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s6">
+                        {#                Item Description#}
+                        <input value="" name="description" type="text" class="validate">
+                        <label class="active" for="description">Description</label>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="input-field col s6">
+                        <select name="category_id">
+                            <!--<option value="" disabled selected>Choose your option</option>-->
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <label>Materialize Select</label>
+                    </div>
+
+                </div>
+                <input type="submit" class="waves-effect waves-light btn" value="Submit">
+
+            </div>
+        </form>
+    </div>
+
+{% endblock %}
