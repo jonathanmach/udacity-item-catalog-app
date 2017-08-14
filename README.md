@@ -13,3 +13,4 @@ The application provides a list of items within a variety of categories as well 
 * Run the project.py file: python project.py
 
 ### Screenshot ###
+![Alt text](https://raw.githubusercontent.com/jonathanfmachado/udacity-item-catalog-app/master/thumbnail.png)
