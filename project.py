@@ -1,3 +1,4 @@
+from functools import wraps
 from flask import Flask, render_template, url_for, request, redirect, jsonify
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -27,8 +28,21 @@ DBSession = sessionmaker(bind=engine)
 session = DBSession()
 
 
+def login_required(func):
+    @wraps(func) # this requires an import
+    def wrapper():
+        if 'username' not in login_session:
+            return redirect('login')
+        else:
+            func()
+    return wrapper
+
+
 # User Helper Functions
 def create_user(login_session):
+    """
+    Create a new user in the database.
+    """
     new_user = User(name=login_session['username'], email=login_session[
         'email'], picture=login_session['picture'])
     session.add(new_user)
@@ -38,11 +52,17 @@ def create_user(login_session):
 
 
 def get_user_info(user_id):
+    """
+    Returns an User object based on a given user_id
+    """
     user = session.query(User).filter_by(id=user_id).one()
     return user
 
 
 def get_user_id(email):
+    """
+    Returns an User object based on a given email
+    """
     try:
         user = session.query(User).filter_by(email=email).one()
         return user.id
@@ -51,6 +71,9 @@ def get_user_id(email):
 
 
 def populate_database():
+    """
+    Used only once for inserting sample data.
+    """
     session.add(Category(name="Soccer"))
     session.add(Category(name="Basketball"))
     session.add(Category(name="Baseball"))
@@ -64,6 +87,9 @@ def populate_database():
 
 @app.route('/gconnect', methods=['POST', ])
 def gconnect():
+    """
+    Gathers data from Google Sign In API and places it inside a session variable.
+    """
     # Validate state token
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
@@ -107,7 +133,6 @@ def gconnect():
     if result['issued_to'] != CLIENT_ID:
         response = make_response(
             json.dumps("Token's client ID does not match app's."), 401)
-        print "Token's client ID does not match app's."
         response.headers['Content-Type'] = 'application/json'
         return response
 
@@ -153,19 +178,19 @@ def gconnect():
     output += login_session['picture']
     output += ' " style = "width: 300px; height: 300px;border-radius: 150px;' \
               '-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
-    # flash("you are now logged in as %s" % login_session['username'])
-    print "done!"
     return output
 
 
 @app.route('/fbconnect', methods=['POST', ])
 def fbconnect():
+    """
+    Gathers data from Facebook Sign In API and places it inside a session variable.
+    """
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
     access_token = request.data
-    print "access token received %s " % access_token
 
     app_id = json.loads(open('fb_client_secret.json', 'r').read())[
         'web']['app_id']
@@ -191,8 +216,6 @@ def fbconnect():
           'access_token=%s&fields=name,id,email' % token
     h = httplib2.Http()
     result = h.request(url, 'GET')[1]
-    # print "url sent for API access:%s"% url
-    # print "API JSON result: %s" % result
     data = json.loads(result)
     login_session['provider'] = 'facebook'
     login_session['username'] = data["name"]
@@ -227,12 +250,14 @@ def fbconnect():
     output += ' " style = "width: 300px; height: 300px;border-radius: 150px;' \
               '-webkit-border-radius: 150px;-moz-border-radius: 150px;"> '
 
-    # flash("Now logged in as %s" % login_session['username'])
     return output
 
 
 @app.route('/login')
 def show_login():
+    """
+    Renders the login page.
+    """
     state = ''.join(random.choice(string.ascii_uppercase + string.digits)
                     for x in xrange(32))
     login_session['state'] = state
@@ -241,18 +266,18 @@ def show_login():
 
 @app.route('/logout')
 def gdisconnect():
+    """
+    Check if the existing login is Google or Facebook based. Then,
+    revokes the access token and delete login_session variables.
+    """
     if login_session['provider'] == 'google':
         # Only disconnect a connected user
         access_token = login_session.get('access_token')
         if access_token is None:
-            print 'Access Token is None'
             response = make_response(
                 json.dumps('Current user not connected.'), 401)
             response.headers['Content-Type'] = 'application/json'
             return response
-        print 'In gdisconnect access token is %s', access_token
-        print 'User name is: '
-        print login_session['username']
 
         del login_session['access_token']
         del login_session['gplus_id']
@@ -296,7 +321,9 @@ def gdisconnect():
 
 @app.route('/')
 def main():
-    """Returns all categories and items"""
+    """
+    Returns all categories and items
+    """
     cat = session.query(Category).all()
     items = session.query(CatalogItem).all()
     return render_template(
@@ -309,6 +336,9 @@ def main():
 # Item details
 @app.route('/catalog/<category_name>/<item_name>/')
 def catalog(category_name, item_name):
+    """
+    Returns Item details based on a given Item name and its Category.
+    """
     cat = session.query(Category).all()
     selected_category = session.query(
         Category).filter_by(name=category_name).one()
@@ -329,6 +359,9 @@ def catalog(category_name, item_name):
 # Items from specific Category
 @app.route('/catalog/<category_name>/items/')
 def catalog_items(category_name):
+    """
+    Returns all items for a given Category.
+    """
     cat = session.query(Category).all()
     selected_category = session.query(
         Category).filter_by(name=category_name).one()
@@ -344,10 +377,11 @@ def catalog_items(category_name):
 
 # Update an item
 @app.route('/catalog/<item_name>/edit/', methods=['GET', 'POST'])
+@login_required
 def edit_item(item_name):
-    if 'username' not in login_session:
-        return redirect(url_for('show_login'))
-
+    """
+    Returns the form that allows the editing/updating of a given item.
+    """
     if request.method == 'POST':
         item = session.query(CatalogItem).filter_by(name=item_name).one()
         # Get posted values
@@ -383,10 +417,11 @@ def edit_item(item_name):
 
 # Add a new item
 @app.route('/catalog/add_item/', methods=['GET', 'POST'])
+@login_required
 def add_item():
-    if 'username' not in login_session:
-        return redirect(url_for('show_login'))
-
+    """
+    Handles the inserting of a new item.
+    """
     if request.method == 'POST':
         # Get posted values
         title = request.form['title']
@@ -416,8 +451,12 @@ def add_item():
 
 
 # Delete an existing item
+@login_required
 @app.route('/catalog/<item_name>/delete/', methods=['GET', 'POST'])
 def delete_item(item_name):
+    """
+    Handles the deleting of a given Item.
+    """
     if 'username' not in login_session:
         return redirect(url_for('show_login'))
 
@@ -442,6 +481,9 @@ def delete_item(item_name):
 # API Endpoint
 @app.route('/catalog.json/')
 def jsonapi():
+    """
+    Returns a JSON containg all Categories and its items.
+    """
     all_cat = session.query(Category).all()
     json_response = []
     for i in all_cat:
@@ -453,6 +495,16 @@ def jsonapi():
         cat['items'] = items
         json_response.append(cat)
     return jsonify(json_response)
+
+
+@app.route('/catalog.json/<item_name>')
+def jsonapi_item(item_name):
+    """
+    Implements a JSON endpoint that serves the same information as displayed in the
+    HTML endpoints for an arbitrary item in the catalog.
+    """
+    item = session.query(CatalogItem).filter_by(name=item_name).one()
+    return jsonify(item.serialize)
 
 
 if __name__ == "__main__":
