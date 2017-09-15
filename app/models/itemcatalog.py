@@ -81,6 +81,10 @@ def edit_item(item_name):
     """
     Returns the form that allows the editing/updating of a given item.
     """
+    cat = session.query(Category).all()
+    item = session.query(CatalogItem).filter_by(name=item_name).one()
+    if item.user_id != login_session['user_id']:
+        return 'Not allowed'
     if request.method == 'POST':
         item = session.query(CatalogItem).filter_by(name=item_name).one()
         # Get posted values
@@ -102,11 +106,8 @@ def edit_item(item_name):
                 item_name=item.name,
             ))
 
-    else:
-        cat = session.query(Category).all()
-        item = session.query(CatalogItem).filter_by(name=item_name).one()
-        if item.user_id != login_session['user_id']:
-            return 'Not allowed'
+    else:  # GET Method
+
         return render_template(
             'edit-item.html',
             item=item,
