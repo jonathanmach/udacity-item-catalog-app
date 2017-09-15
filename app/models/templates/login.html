@@ -36,7 +36,7 @@
             console.log(authResult)
             $.ajax({
                 type: 'POST',
-                url: '/gconnect?state={{ STATE }}',
+                url: '/auth/gconnect?state={{ STATE }}',
                 processData: false,
                 contentType: 'application/octet-stream; charset=utf-8',
                 data: authResult['code'],

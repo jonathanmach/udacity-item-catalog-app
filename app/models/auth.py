@@ -1,5 +1,7 @@
 from functools import wraps
-from flask import Flask, render_template, url_for, request, redirect, jsonify
+
+from app.models.user import get_user_id, create_user
+from flask import Flask, render_template, url_for, request, redirect, jsonify, Blueprint
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database_setup import Base, Category, CatalogItem, User
@@ -15,77 +17,25 @@ import json
 import requests
 from flask import make_response
 
-app = Flask(__name__)
+auth = Blueprint('auth', __name__, template_folder='templates')
 
 # Google Client ID
 CLIENT_ID = json.loads(
     open('client_secret.json', 'r').read())['web']['client_id']
 
-engine = create_engine('sqlite:///catalogapp.db')
-Base.metadata.bind = engine
-
-DBSession = sessionmaker(bind=engine)
-session = DBSession()
-
 
 def login_required(func):
-    @wraps(func) # this requires an import
+    @wraps(func)  # this requires an import
     def wrapper():
         if 'username' not in login_session:
             return redirect('login')
         else:
             func()
+
     return wrapper
 
 
-# User Helper Functions
-def create_user(login_session):
-    """
-    Create a new user in the database.
-    """
-    new_user = User(name=login_session['username'], email=login_session[
-        'email'], picture=login_session['picture'])
-    session.add(new_user)
-    session.commit()
-    user = session.query(User).filter_by(email=login_session['email']).one()
-    return user.id
-
-
-def get_user_info(user_id):
-    """
-    Returns an User object based on a given user_id
-    """
-    user = session.query(User).filter_by(id=user_id).one()
-    return user
-
-
-def get_user_id(email):
-    """
-    Returns an User object based on a given email
-    """
-    try:
-        user = session.query(User).filter_by(email=email).one()
-        return user.id
-    except BaseException:
-        return None
-
-
-def populate_database():
-    """
-    Used only once for inserting sample data.
-    """
-    session.add(Category(name="Soccer"))
-    session.add(Category(name="Basketball"))
-    session.add(Category(name="Baseball"))
-    session.add(Category(name="Frisbee"))
-    session.add(Category(name="Snowboarding"))
-    session.add(Category(name="Rock Climbing"))
-    session.add(Category(name="Skating"))
-    session.add(Category(name="Hockey"))
-    session.commit()
-
-
-@app.route('/gconnect', methods=['POST', ])
+@auth.route('/gconnect', methods=['POST', ])
 def gconnect():
     """
     Gathers data from Google Sign In API and places it inside a session variable.
@@ -181,7 +131,7 @@ def gconnect():
     return output
 
 
-@app.route('/fbconnect', methods=['POST', ])
+@auth.route('/fbconnect', methods=['POST', ])
 def fbconnect():
     """
     Gathers data from Facebook Sign In API and places it inside a session variable.
@@ -253,7 +203,7 @@ def fbconnect():
     return output
 
 
-@app.route('/login')
+@auth.route('/login')
 def show_login():
     """
     Renders the login page.
@@ -264,7 +214,7 @@ def show_login():
     return render_template('login.html', STATE=state)
 
 
-@app.route('/logout')
+@auth.route('/logout')
 def gdisconnect():
     """
     Check if the existing login is Google or Facebook based. Then,
@@ -317,197 +267,3 @@ def gdisconnect():
         del login_session['picture']
 
         return "you have been logged out"
-
-
-@app.route('/')
-def main():
-    """
-    Returns all categories and items
-    """
-    cat = session.query(Category).all()
-    items = session.query(CatalogItem).all()
-    return render_template(
-        'latest.html',
-        item_list=items,
-        categories=cat,
-        login_session=login_session)
-
-
-# Item details
-@app.route('/catalog/<category_name>/<item_name>/')
-def catalog(category_name, item_name):
-    """
-    Returns Item details based on a given Item name and its Category.
-    """
-    cat = session.query(Category).all()
-    selected_category = session.query(
-        Category).filter_by(name=category_name).one()
-    item = session.query(CatalogItem).filter_by(
-        name=item_name, category_id=selected_category.id).one()
-    iscreator = False
-    if item.user_id == login_session['user_id']:
-        iscreator = True
-
-    return render_template(
-        'item-details.html',
-        categories=cat,
-        item=item,
-        login_session=login_session,
-        iscreator=iscreator)
-
-
-# Items from specific Category
-@app.route('/catalog/<category_name>/items/')
-def catalog_items(category_name):
-    """
-    Returns all items for a given Category.
-    """
-    cat = session.query(Category).all()
-    selected_category = session.query(
-        Category).filter_by(name=category_name).one()
-    items = session.query(CatalogItem).filter_by(
-        category_id=selected_category.id)
-    return render_template(
-        'category-items.html',
-        item_list=items,
-        categories=cat,
-        category_name=category_name,
-        login_session=login_session)
-
-
-# Update an item
-@app.route('/catalog/<item_name>/edit/', methods=['GET', 'POST'])
-@login_required
-def edit_item(item_name):
-    """
-    Returns the form that allows the editing/updating of a given item.
-    """
-    if request.method == 'POST':
-        item = session.query(CatalogItem).filter_by(name=item_name).one()
-        # Get posted values
-        title = request.form['title']
-        description = request.form['description']
-        category_id = request.form['category_id']
-
-        # Set new values
-        item.name = title
-        item.description = description
-        item.category_id = category_id
-        session.add(item)
-        session.commit()
-
-        return redirect(
-            url_for(
-                'catalog',
-                category_name=item.category.name,
-                item_name=item.name,
-            ))
-
-    else:
-        cat = session.query(Category).all()
-        item = session.query(CatalogItem).filter_by(name=item_name).one()
-        if item.user_id != login_session['user_id']:
-            return 'Not allowed'
-        return render_template(
-            'edit-item.html',
-            item=item,
-            categories=cat,
-            login_session=login_session)
-
-
-# Add a new item
-@app.route('/catalog/add_item/', methods=['GET', 'POST'])
-@login_required
-def add_item():
-    """
-    Handles the inserting of a new item.
-    """
-    if request.method == 'POST':
-        # Get posted values
-        title = request.form['title']
-        description = request.form['description']
-        category_id = request.form['category_id']
-
-        # Create new item
-        new_item = CatalogItem(
-            name=title,
-            description=description,
-            category_id=category_id,
-            user_id=login_session['user_id'])
-        session.add(new_item)
-        session.commit()
-
-        return redirect(
-            url_for(
-                'catalog_items',
-                category_name=new_item.category.name))
-
-    else:
-        cat = session.query(Category).all()
-        return render_template(
-            'add-item.html',
-            categories=cat,
-            login_session=login_session)
-
-
-# Delete an existing item
-@login_required
-@app.route('/catalog/<item_name>/delete/', methods=['GET', 'POST'])
-def delete_item(item_name):
-    """
-    Handles the deleting of a given Item.
-    """
-    if 'username' not in login_session:
-        return redirect(url_for('show_login'))
-
-    cat = session.query(Category).all()
-    item = session.query(CatalogItem).filter_by(name=item_name).one()
-    if item.user_id != login_session['user_id']:
-        return 'Not allowed'
-
-    if request.method == 'POST':
-        cat_name = item.category.name
-        session.delete(item)
-        session.commit()
-        return redirect(url_for('catalog_items', category_name=cat_name))
-    else:
-        return render_template(
-            'delete-item.html',
-            item=item,
-            categories=cat,
-            login_session=login_session)
-
-
-# API Endpoint
-@app.route('/catalog.json/')
-def jsonapi():
-    """
-    Returns a JSON containg all Categories and its items.
-    """
-    all_cat = session.query(Category).all()
-    json_response = []
-    for i in all_cat:
-        cat = i.serialize
-        all_items = session.query(CatalogItem).filter_by(category_id=i.id)
-        items = []
-        for x in all_items:
-            items.append(x.serialize)
-        cat['items'] = items
-        json_response.append(cat)
-    return jsonify(json_response)
-
-
-@app.route('/catalog.json/<item_name>')
-def jsonapi_item(item_name):
-    """
-    Implements a JSON endpoint that serves the same information as displayed in the
-    HTML endpoints for an arbitrary item in the catalog.
-    """
-    item = session.query(CatalogItem).filter_by(name=item_name).one()
-    return jsonify(item.serialize)
-
-
-if __name__ == "__main__":
-    app.secret_key = 'super_secret_key'
-    app.debug = True
-    app.run(host='0.0.0.0', port=8000)

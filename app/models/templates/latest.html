@@ -3,14 +3,14 @@
     <h5>Latest Items</h5>
     <div class="collection">
         {% for item in item_list %}
-            <a href='{{ url_for('catalog', category_name=item.category.name, item_name=item.name) }}'
+            <a href='{{ url_for('itemcatalog.catalog', category_name=item.category.name, item_name=item.name) }}'
                class="collection-item">
                 {{ item.name }} <i style="color:gray">({{ item.category.name }})</i></a>
         {% endfor %}
     </div>
     {% if 'username' in login_session %}
         <div style="text-align: right">
-            <a href="{{ url_for('add_item') }}" class="btn-floating btn-large waves-effect waves-light red "><i
+            <a href="{{ url_for('itemcatalog.add_item') }}" class="btn-floating btn-large waves-effect waves-light red "><i
                     class="material-icons">add</i></a>
         </div>
     {% endif %}

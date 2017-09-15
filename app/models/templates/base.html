@@ -24,9 +24,9 @@
             <a href="/" class="brand-logo">Catalog App</a>
             <ul id="nav-mobile" class="right hide-on-med-and-down">
                 {% if 'username' in login_session %}
-                    <li><a href="{{ url_for('gdisconnect') }}">Logout</a></li>
+                    <li><a href="{{ url_for('auth.gdisconnect') }}">Logout</a></li>
                 {% else %}
-                    <li><a href="{{ url_for('show_login') }}">Login</a></li>
+                    <li><a href="{{ url_for('auth.show_login') }}">Login</a></li>
                 {% endif %}
 
             </ul>
@@ -42,7 +42,7 @@
             <div class="collection">
 
                 {% for item in categories %}
-                    <a class="collection-item" href='{{ url_for('catalog_items', category_name=item.name) }}'>
+                    <a class="collection-item" href='{{ url_for('itemcatalog.catalog_items', category_name=item.name) }}'>
                         <i class="tiny material-icons">label</i>
                         {{ item.name }}</a>
                 {% endfor %}
@@ -64,6 +64,8 @@
             $('select').material_select();
         });
     </script>
+
+</div>
 </body>
 
 </html>

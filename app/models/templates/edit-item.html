@@ -1,7 +1,7 @@
 {% extends "base.html" %} {% block body %}
     <div class="col s9">
 
-        <form method="post" action="{{ url_for('edit_item', item_name=item.name) }}">
+        <form method="post" action="{{ url_for('itemcatalog.edit_item', item_name=item.name) }}">
             <!-- Teal page content  -->
             <div class="section">
                 <h5><i class="material-icons">edit</i> Edit Item</h5>
