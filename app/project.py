@@ -2,12 +2,13 @@ from flask import Flask, redirect, url_for
 # Working with Blueprints
 from models.itemcatalog import itemcatalog
 from models.auth import auth
-
+from models.api import api
 
 app = Flask(__name__)
 
 app.register_blueprint(itemcatalog)
 app.register_blueprint(auth, url_prefix="/auth")
+app.register_blueprint(api)
 
 
 
